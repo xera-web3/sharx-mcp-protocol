@@ -1,0 +1,22 @@
+{
+  "name": "@sharx/api-contract",
+  "version": "0.1.0",
+  "description": "Shared TypeScript types between promotion-web3 backend and sharx-mcp-server. The single source of truth for the Web3 ↔ MCP API contract. See api-contract-v2-2.md for the spec.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "api-contract-v2-2.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}
