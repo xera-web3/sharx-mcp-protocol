@@ -1,17 +1,20 @@
 {
-  "name": "@sharx/api-contract",
+  "name": "@xera-web3/sharx-mcp-protocol",
   "version": "0.1.1",
-  "description": "Shared TypeScript types between promotion-web3 backend and sharx-mcp-server. The single source of truth for the Web3 ↔ MCP API contract. See api-contract-v2-2.md for the spec.",
+  "description": "Shared TypeScript types between promotion-web3 backend and sharx-mcp-server. Single source of truth for the Sharx MCP protocol (Web3 \u2194 MCP API contract). See specs/api-contract-v2-2.md.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
     "src",
-    "api-contract-v2-2.md"
+    "specs",
+    "CHANGELOG.md",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc",
+    "prepare": "tsc",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
@@ -19,5 +22,9 @@
   "private": true,
   "devDependencies": {
     "typescript": "^5.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/xera-web3/sharx-mcp-protocol.git"
   }
 }
