@@ -20,7 +20,8 @@ export type UserRecord = {
   username: string | null;
   wallet: Address;
   smart_account_address: Address | null;
-  smart_account_deployed: boolean;
+  /** true = on-chain contract exists; false = definitively not deployed; null = RPC check failed / unknown */
+  smart_account_deployed: boolean | null;
 };
 
 // GET /api/v1/agent/lookup/by-wallet/:address          → UserRecord

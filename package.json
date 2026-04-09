@@ -1,6 +1,6 @@
 {
   "name": "@xera-web3/sharx-mcp-protocol",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Shared TypeScript types between promotion-web3 backend and sharx-mcp-server. Single source of truth for the Sharx MCP protocol (Web3 \u2194 MCP API contract). See specs/api-contract-v2-2.md.",
   "type": "module",
   "main": "dist/index.js",
