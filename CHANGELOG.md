@@ -2,6 +2,32 @@
 
 All notable changes to `@xera-web3/sharx-mcp-protocol` are documented here.
 
+## v0.2.1 — 2026-05-09
+
+**Add shared mint-fee formula** so promotion-web3 backend and sharx-mcp-server compute the same SHX cost from upload byte size without drift. Required by the upcoming `mint_card_to_recipient` MCP tool.
+
+- New module `mint-fee.ts`:
+  - `MINT_FEE_CONFIG` — base 50 MiB / step 5 MiB / clamp [10, 100] SHX, 18 decimals
+  - `calculateMintFeeBreakdown(totalBytes)` — full breakdown (totalBytes, extraBytes, extraSteps, feeShx, feeWei)
+  - `calculateMintFeeShx(totalBytes)` — SHX-only convenience
+  - `calculateMintFeeWei(totalBytes)` — wei BigInt convenience
+- Barrel export updated.
+
+Caller flow (see module JSDoc): read `Post1155.mintPrice()` on-chain → compute formula `feeWei` → `extraFeeWei = max(formula, contract) - contract` → transfer extraFee to treasury within the mint userOp bundle.
+
+## v0.2.0 — 2026-04-14
+
+**Pivot Arbitrum → Base.** Reconciled into git on 2026-05-09; the npm publish happened in April but the source commit was never landed back.
+
+- `chain.ts` — `ChainId` enum switched: Arbitrum 42161/421614 → Base 8453/84532. `DEFAULT_CHAIN_ID` and `isSupportedChainId` updated to match.
+- `package.json` — license `UNLICENSED` → `MIT`, removed `private: true`, added `publishConfig.access: "public"` for the npm publish path.
+
+Breaking change for any caller that imported the literal Arbitrum chain ids — replace with the Base equivalents.
+
+## v0.1.2 — earlier (pre-Base pivot)
+
+- `fix: smart_account_deployed` typed as `boolean | null` (was `boolean`).
+
 ## v0.1.1 — 2026-04-09
 
 **First public-ish release** under the new name `@xera-web3/sharx-mcp-protocol`. Same content as the bootstrap v0.1.0, plus:
