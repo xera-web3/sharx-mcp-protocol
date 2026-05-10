@@ -2,6 +2,31 @@
 
 All notable changes to `@xera-web3/sharx-mcp-protocol` are documented here.
 
+## v0.3.0 — 2026-05-10
+
+**Add IPFS upload protocol** — supports the upcoming `upload_card` MCP tool (Plan X + Pattern C: TUS for assets, server-side direct for metadata JSON). Both promotion-web3 and sharx-mcp-server import the new module so file-size limits, MIME accept lists, codec whitelist, and filename sanitization stay in sync.
+
+### Added
+
+- `src/upload.ts`
+  - `UPLOAD_LIMITS` — 300/450/650/500 MB caps + 50 MB TUS chunk + 1.4× base64 overhead factor.
+  - `ACCEPTED_IMAGE_MIMES` — PNG, JPEG, GIF, SVG, WEBP, HEIC. (Animated GIF treated as image.)
+  - `ACCEPTED_VIDEO_MIMES` — MP4, QuickTime.
+  - `ACCEPTED_PRIVATE_AUDIO_MIME_PREFIX` — `audio/` (private content only; not allowed for public mint asset).
+  - `SUPPORTED_VIDEO_CODECS` — H.264 (avc1/2/3/4) + H.265 (hvc1/hev1).
+  - `sanitizeFilename(name)` — NFKD normalize, strip diacritics, replace non-`[a-zA-Z0-9_-]` runs, cap base 120 chars, fallback to `upload_<ts>_<rand>`.
+  - `mimeToAssetType(mime)` — returns `'image' | 'video' | 'audio' | null`.
+  - `validateUpload({mime_type, size_bytes, is_private})` — returns null if OK, otherwise `'UNSUPPORTED_MIME'` or `'FILE_TOO_LARGE'`.
+  - I/O types for 7 endpoints: `TusKey{Input,Output}`, `TusKeyRevoke{Input,Output}`, `PresignUrl{Input,Output}`, `CidLookup{Input,Output}`, `GroupCreate{Input,Output}`, `GroupRename{Input,Output}`, `UploadMetadata{Input,Output}`, `ConfirmUpload{Input,Output}`.
+
+- `src/errors.ts`
+  - 4 new `ErrorCode` values: `CID_BUCKET_COLLISION`, `FILE_TOO_LARGE`, `UNSUPPORTED_MIME`, `PINATA_ERROR`.
+  - 1 new `ErrorLayer` value: `'pinata'`.
+
+### Why minor (0.2.x → 0.3.x) bump
+
+Strictly additive — no symbols removed, no signatures changed. Existing consumers (promotion-web3 v0.2.1 + sharx-mcp-server v0.2.1) continue to compile against this version. We bump minor instead of patch because new exports broaden the public API surface, signaling consumers that new features (and types) are available.
+
 ## v0.2.1 — 2026-05-09
 
 **Add shared mint-fee formula** so promotion-web3 backend and sharx-mcp-server compute the same SHX cost from upload byte size without drift. Required by the upcoming `mint_card_to_recipient` MCP tool.

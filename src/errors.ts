@@ -37,6 +37,12 @@ export type ErrorCode =
   | 'OPENSEA_REJECTED'
   | 'OPENSEA_UNAVAILABLE'
 
+  // IPFS / Pinata upload (added v0.3.0 for upload_card flow)
+  | 'CID_BUCKET_COLLISION'     // CID already exists in the opposite Pinata bucket
+  | 'FILE_TOO_LARGE'           // exceeds MAX_UPLOAD_FILE_BYTES_SERVER
+  | 'UNSUPPORTED_MIME'         // MIME not in ACCEPTED_*_MIMES for asset_type
+  | 'PINATA_ERROR'             // upstream Pinata 5xx / SDK throw
+
   // Cross-boundary
   | 'UPSTREAM_TIMEOUT'
   | 'WEB3_BACKEND_ERROR'
@@ -50,6 +56,7 @@ export type ErrorLayer =
   | 'bundler'
   | 'chain'
   | 'opensea'
+  | 'pinata'
   | 'web3-backend'
   | 'internal';
 

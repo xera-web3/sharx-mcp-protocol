@@ -8,3 +8,4 @@ export * from './health.js';
 export * from './web3-routes.js';
 export * from './mcp-tools.js';
 export * from './mint-fee.js';
+export * from './upload.js';
