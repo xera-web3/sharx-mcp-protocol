@@ -324,3 +324,209 @@ export function validateUpload(input: {
   if (isAudio && input.is_private) return null;
   return 'UNSUPPORTED_MIME';
 }
+
+// =============================================================================
+// Private-content policy (v0.3.1)
+// =============================================================================
+
+/**
+ * Sharx product rule (Tim directive 2026-05-11): every minted card MUST have
+ * private content gated to NFT holders. Enforced at the MCP layer before
+ * calling /api/v1/agent/ipfs/upload-metadata; backend route mirrors via
+ * defense-in-depth.
+ *
+ * Frontend has enforced this since launch via hard-coded `isPrivate=true` in
+ * MintNFT/index.tsx:98. This constant codifies the rule for MCP + backend.
+ */
+export const REQUIRE_PRIVATE_CONTENT = true as const;
+
+/**
+ * Explicit allow-list of PRIVATE content MIMEs per PUBLIC card type. Any
+ * `audio/*` subtype is additionally admitted via prefix check — listing every
+ * audio subtype here would drift.
+ *
+ * Card-type semantics:
+ *   - 'image': public asset is image; private can be image / video / audio.
+ *   - 'video': public asset is video; private can be image / video / audio.
+ *   - 'audio': PUBLIC asset is an image COVER (rendered in marketplaces);
+ *     PRIVATE content MUST be audio (the audio body, gated to holders).
+ *     ERC-1155 metadata's `image` field is the visual representation; the
+ *     actual audio lives behind the holder paywall.
+ */
+export const ALLOWED_PRIVATE_MIMES_BY_PUBLIC_TYPE = {
+  image: [
+    ...ACCEPTED_IMAGE_MIMES,
+    ...ACCEPTED_VIDEO_MIMES,
+    // audio/* admitted via prefix check
+  ],
+  video: [
+    ...ACCEPTED_IMAGE_MIMES,
+    ...ACCEPTED_VIDEO_MIMES,
+    // audio/* admitted via prefix check
+  ],
+  audio: [
+    // explicit list empty — only audio/* admitted via prefix check
+  ],
+} as const satisfies Record<'image' | 'video' | 'audio', readonly string[]>;
+
+/**
+ * Required PUBLIC asset MIME family per declared card type. For type='audio'
+ * the public asset is the cover IMAGE (not the audio itself).
+ */
+export const REQUIRED_PUBLIC_MIME_FAMILY_BY_TYPE = {
+  image: ACCEPTED_IMAGE_MIMES,
+  video: ACCEPTED_VIDEO_MIMES,
+  audio: ACCEPTED_IMAGE_MIMES, // cover image
+} as const satisfies Record<'image' | 'video' | 'audio', readonly string[]>;
+
+export interface CardUploadInput {
+  /**
+   * Card type from `UploadMetadataInput.type`. For `'audio'`: public asset is
+   * cover image, private content MUST be audio.
+   */
+  public_type: 'image' | 'video' | 'audio';
+  public_mime_type: string;
+  public_size_bytes: number;
+  /**
+   * Required per `REQUIRE_PRIVATE_CONTENT`. Omitting yields `INVALID_INPUT`.
+   */
+  private_mime_type?: string;
+  private_size_bytes?: number;
+}
+
+export type CardUploadValidationError =
+  | 'UNSUPPORTED_MIME'
+  | 'FILE_TOO_LARGE'
+  | 'INVALID_INPUT';
+
+export type CardUploadValidationResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code: CardUploadValidationError;
+      field: string;
+      reason: string;
+    };
+
+/**
+ * Validate private content against the per-public-type allow list + size cap.
+ * Returns null if valid, otherwise the error code.
+ */
+export function validatePrivateContent(input: {
+  public_type: 'image' | 'video' | 'audio';
+  private_mime_type: string;
+  private_size_bytes: number;
+}): 'UNSUPPORTED_MIME' | 'FILE_TOO_LARGE' | null {
+  if (input.private_size_bytes > UPLOAD_LIMITS.MAX_UPLOAD_FILE_BYTES_SERVER) {
+    return 'FILE_TOO_LARGE';
+  }
+  const explicitList = ALLOWED_PRIVATE_MIMES_BY_PUBLIC_TYPE[input.public_type];
+  const isInExplicitList = (explicitList as readonly string[]).includes(
+    input.private_mime_type,
+  );
+  const isAudio = input.private_mime_type.startsWith(
+    ACCEPTED_PRIVATE_AUDIO_MIME_PREFIX,
+  );
+
+  // For audio cards: audio is the ONLY admitted private MIME (the audio body).
+  if (input.public_type === 'audio') {
+    return isAudio ? null : 'UNSUPPORTED_MIME';
+  }
+
+  // For image / video cards: image, video, or audio all admitted.
+  if (isInExplicitList || isAudio) return null;
+  return 'UNSUPPORTED_MIME';
+}
+
+/**
+ * Top-level card upload validator. Call from MCP `upload_card` tool BEFORE
+ * forwarding to `/api/v1/agent/ipfs/upload-metadata`; backend route mirrors
+ * for defense-in-depth.
+ *
+ * Enforces:
+ *   1. `public_type` ∈ `{'image','video','audio'}`.
+ *   2. `public_mime_type` matches required family for the type.
+ *   3. `public_size_bytes` ≤ `MAX_UPLOAD_FILE_BYTES_SERVER`.
+ *   4. Private content is REQUIRED (`REQUIRE_PRIVATE_CONTENT`).
+ *   5. `private_mime_type` admitted by `ALLOWED_PRIVATE_MIMES_BY_PUBLIC_TYPE`
+ *      (or `audio/*` prefix); for type=`'audio'` only audio is admitted.
+ *   6. `private_size_bytes` ≤ `MAX_UPLOAD_FILE_BYTES_SERVER`.
+ */
+export function validateCardUpload(
+  input: CardUploadInput,
+): CardUploadValidationResult {
+  // 1. Public type literal check.
+  if (
+    input.public_type !== 'image' &&
+    input.public_type !== 'video' &&
+    input.public_type !== 'audio'
+  ) {
+    return {
+      ok: false,
+      code: 'INVALID_INPUT',
+      field: 'public_type',
+      reason: `public_type must be 'image' | 'video' | 'audio'; got '${input.public_type as string}'`,
+    };
+  }
+
+  // 2. Public asset MIME family.
+  const requiredFamily =
+    REQUIRED_PUBLIC_MIME_FAMILY_BY_TYPE[input.public_type];
+  if (!(requiredFamily as readonly string[]).includes(input.public_mime_type)) {
+    return {
+      ok: false,
+      code: 'UNSUPPORTED_MIME',
+      field: 'public_mime_type',
+      reason: `public asset for type='${input.public_type}' must be one of [${requiredFamily.join(', ')}]; got '${input.public_mime_type}'`,
+    };
+  }
+
+  // 3. Public asset size.
+  if (input.public_size_bytes > UPLOAD_LIMITS.MAX_UPLOAD_FILE_BYTES_SERVER) {
+    return {
+      ok: false,
+      code: 'FILE_TOO_LARGE',
+      field: 'public_size_bytes',
+      reason: `public asset exceeds ${UPLOAD_LIMITS.MAX_UPLOAD_FILE_BYTES_SERVER} bytes`,
+    };
+  }
+
+  // 4. Private content presence.
+  if (
+    REQUIRE_PRIVATE_CONTENT &&
+    (!input.private_mime_type || input.private_size_bytes == null)
+  ) {
+    return {
+      ok: false,
+      code: 'INVALID_INPUT',
+      field: 'private_content',
+      reason:
+        'every Sharx card MUST have private content; private_mime_type and private_size_bytes are required',
+    };
+  }
+
+  // 5+6. Private content MIME + size.
+  if (input.private_mime_type && input.private_size_bytes != null) {
+    const privErr = validatePrivateContent({
+      public_type: input.public_type,
+      private_mime_type: input.private_mime_type,
+      private_size_bytes: input.private_size_bytes,
+    });
+    if (privErr) {
+      const reason =
+        privErr === 'FILE_TOO_LARGE'
+          ? `private content exceeds ${UPLOAD_LIMITS.MAX_UPLOAD_FILE_BYTES_SERVER} bytes`
+          : input.public_type === 'audio'
+            ? `private content for type='audio' must be audio/*; got '${input.private_mime_type}'`
+            : `private content MIME '${input.private_mime_type}' not allowed for type='${input.public_type}'`;
+      return {
+        ok: false,
+        code: privErr,
+        field: 'private_content',
+        reason,
+      };
+    }
+  }
+
+  return { ok: true };
+}

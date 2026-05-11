@@ -2,6 +2,40 @@
 
 All notable changes to `@xera-web3/sharx-mcp-protocol` are documented here.
 
+## v0.3.1 — 2026-05-11
+
+**Add private-content policy** — codify the Sharx product rule that every minted card MUST have private content gated to NFT holders. Tim directive 2026-05-11 (after e2e demo on Base Sepolia surfaced that the rule was UI-only). Frontend has enforced this since launch via hard-coded `isPrivate=true` in `promotion-web3 MintNFT/index.tsx:98`; this release brings the rule into the protocol so MCP-side mints stay consistent.
+
+Pure additive — no symbols removed, no signatures changed. Existing v0.3.0 consumers continue to compile without changes.
+
+### Added (`src/upload.ts`)
+
+- `REQUIRE_PRIVATE_CONTENT` (`true as const`) — top-level policy flag.
+- `ALLOWED_PRIVATE_MIMES_BY_PUBLIC_TYPE` — explicit MIME allow-list keyed by card type. `audio/*` is admitted via prefix check.
+- `REQUIRED_PUBLIC_MIME_FAMILY_BY_TYPE` — required public asset MIME family per card type (image for `'audio'` cards = cover art).
+- `validatePrivateContent({public_type, private_mime_type, private_size_bytes})` — returns `null` if OK, else `'UNSUPPORTED_MIME' | 'FILE_TOO_LARGE'`.
+- `validateCardUpload(input: CardUploadInput)` — top-level card-level validator (public + private). Returns discriminated `{ok:true} | {ok:false, code, field, reason}`.
+- Types: `CardUploadInput`, `CardUploadValidationError`, `CardUploadValidationResult`.
+
+### Rules codified
+
+| Public type | Public asset MIME | Private content MIME |
+|---|---|---|
+| `image` | image/png \| jpeg \| gif \| svg+xml \| webp \| heic | any image MIME, any video MIME, or `audio/*` |
+| `video` | video/mp4 \| quicktime | any image MIME, any video MIME, or `audio/*` |
+| `audio` | image MIME (cover art) | `audio/*` only (audio body — required) |
+
+The `audio` card convention: ERC-1155 metadata's `image` field carries cover art (rendered in marketplaces); the audio file itself is gated as private content for NFT holders. Type literal `'audio'` retained for backward compatibility — semantics documented here.
+
+### Why patch (0.3.0 → 0.3.1)
+
+Strictly additive. New helpers + constants only. No type changes, no symbol removals, no signature changes. `UploadMetadataInput.is_private` and `private_cid` remain optional — enforcement happens at the call boundary via `validateCardUpload`.
+
+### Consumer adoption (post-publish, separate PRs)
+
+1. `sharx-mcp-server` — bump pin `^0.3.0` → `^0.3.1`, call `validateCardUpload` in `upload_card` tool pre-flight, drop local validation duplicates.
+2. `promotion-web3` — defense-in-depth: call `validateCardUpload` inside `/api/v1/agent/ipfs/upload-metadata` route handler. Frontend `useNFTUpload` rewires through the same helper (Q5 follow-up).
+
 ## v0.3.0 — 2026-05-10
 
 **Add IPFS upload protocol** — supports the upcoming `upload_card` MCP tool (Plan X + Pattern C: TUS for assets, server-side direct for metadata JSON). Both promotion-web3 and sharx-mcp-server import the new module so file-size limits, MIME accept lists, codec whitelist, and filename sanitization stay in sync.
